@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Triangles</title>
+</head>
+<body>
+  <script type="shader-source" id="vertexShader">
+    precision mediump float;
+    attribute vec2 a_Position;
+    // canvas 尺寸
+    attribute vec2 a_Screen_Size;
+
+    void main(){
+      vec2 position = (a_Position / a_Screen_Size) * 2.0 - 1.0;
+      position = position * vec2(1.0, -1.0);
+      gl_Position = vec4(position, 0, 1);
+    }
+  </script>
+  <script type="shader-source" id="fragmentShader">
+    precision mediump float;
+    uniform vec4 u_Color;
+
+    void main(){
+      vec4 color = u_Color / vec4(255, 255, 255, 1);
+      gl_FragColor = color;
+    }
+  </script>
+  <canvas id="canvas" width="500" height="500"></canvas>
+  <script src="./utils.js"></script>
+  <script>
+    const position = []
+
+    const canvas = document.getElementById('canvas')
+    const gl = getWebGLContext(canvas)
+
+    const vertexShader = createShaderByScript(gl,gl.VERTEX_SHADER, '#vertexShader')
+    const fragmentShader = createShaderByScript(gl, gl.FRAGMENT_SHADER, '#fragmentShader')
+
+    const program = createProgram(gl, vertexShader, fragmentShader)
+    gl.useProgram(program)
+
+    const a_Screen_Size = gl.getAttribLocation(program, 'a_Screen_Size')
+    gl.vertexAttrib2f(a_Screen_Size, canvas.width, canvas.height)
+
+    // 创建缓冲区
+    const buffer = gl.createBuffer()
+    // 绑定缓冲区
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
+    // 向缓冲区写入数据，通过类型化数组转换 JS 数组
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(position), gl.STATIC_DRAW) // STATIC_DRAW 表示只写入一次数据，多次读取，DYNAMIC_DRAW 表示多次写入数据，多次读取，STREAM_DRAW 表示多次写入数据，一次读取。用于优化 GPU 性能
+    
+    // 设置读取缓冲区方式
+      // 每次读取两个数据
+    const size = 2
+    // 数据类型
+    const type = gl.FLOAT
+    // 是否归一化
+    const normalize = false
+    // 每次读取数据之间的间隔
+    const stride = 0
+    // 从缓冲区的第 0 个位置开始读取
+    const offset = 0
+
+    // 找到顶点着色器中的 a_Position 变量
+    const a_Position = gl.getAttribLocation(program, "a_Position")
+    // 启用属性
+    gl.enableVertexAttribArray(a_Position)
+
+    // 将 a_Position 变量获取数据的缓冲区指向 buffer
+    gl.vertexAttribPointer(a_Position, size, type, normalize, stride, offset)
+
+    // 设置清空画布颜色为黑色
+    gl.clearColor(0.0, 0.0, 0.0, 1.0)
+    // 清空画布
+    gl.clear(gl.COLOR_BUFFER_BIT)
+    //TODO: 可以将颜色也写入暂存区，实现多个颜色的绘制
+    const u_Color = gl.getUniformLocation(program, 'u_Color')
+    const color = randomColor()
+    // 为片元着色器中的 u_Color 变量传递颜色值
+    gl.uniform4f(u_Color, color.r, color.g, color.b, color.a)
+
+    canvas.addEventListener('mouseup',e=>{
+      const x = e.pageX
+      const y = e.pageY
+      position.push(x,y)
+      console.log(position)
+      if(position.length%6 === 0){
+        //向缓冲区中复制新的顶点数据。
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(position), gl.DYNAMIC_DRAW);
+
+
+        //重新渲染
+        render(gl)
+
+      }
+    })
+
+    function render(gl){
+      // 设置清空画布颜色为黑色
+      gl.clearColor(0.0, 0.0, 0.0, 1.0)
+      // 清空画布
+      gl.clear(gl.COLOR_BUFFER_BIT)
+
+      // 绘制图元设置为三角形
+      const primitiveType = gl.TRIANGLES
+      // 从 0 开始读取数据
+      const start = 0
+      
+      gl.drawArrays(primitiveType, start, position.length/2)
+    }
+
+  </script>
+</body>
+</html>
