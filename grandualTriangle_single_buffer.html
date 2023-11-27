@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GradualTriangle</title>
+</head>
+<body>
+  <script type="shader-source" id="vertexShader">
+    precision mediump float;
+    attribute vec2 a_Position;
+    attribute vec2 a_Screen_Size;
+    attribute vec4 a_Color;
+
+    // 传往片元着色器的颜色
+    varying vec4 v_Color;
+    void main(){
+      vec2 position = (a_Position / a_Screen_Size) * 2.0 - 1.0;
+      position = position * vec2(1.0, -1.0);
+      gl_Position = vec4(position, 0, 1);
+      v_Color = a_Color;
+    }
+  </script>
+  <script type="shader-source" id="fragmentShader">
+    precision mediump float;
+    varying vec4 v_Color;
+    void main(){
+      vec4 color = v_Color / vec4(255, 255, 255, 1);
+      gl_FragColor = color;
+    }
+  </script>
+
+  <canvas id="canvas" width="500" height="500"></canvas>
+  <script>
+    // 用缓冲区向着色器传递数据有两种方式
+    // 1. 用一个缓冲区传递多种数据
+    // 2. 用多个缓冲区传递多种数据
+    
+    // 多个 buffer 之间操作时，需要先通过 gl.bindBuffer 绑定要操作的 buffer 到 gl.ARRAY_BUFFER 上，这样才能正确的操作 buffer
+    // gl.bufferData 传递数据
+    // gl.vertexAttribPointer 设置属性读取 buffer 的方式
+
+    const canvas = document.getElementById('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+
+    const vertexShaderSource = document.querySelector('#vertexShader').innerText;
+    const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vertexShader, vertexShaderSource);
+    gl.compileShader(vertexShader);
+
+    const fragmentShaderSource = document.querySelector('#fragmentShader').innerText;
+    const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fragmentShader, fragmentShaderSource);
+    gl.compileShader(fragmentShader);
+
+    const program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program)
+    gl.useProgram(program);
+
+    const a_Screen_Size = gl.getAttribLocation(program, 'a_Screen_Size');
+    gl.vertexAttrib2f(a_Screen_Size, canvas.width, canvas.height);
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    
+    const a_Position = gl.getAttribLocation(program, 'a_Position');
+    gl.enableVertexAttribArray(a_Position);
+
+
+    const pSize = 2;
+    const pType = gl.FLOAT;
+    const pNormalize = false;
+    const pStride = 24; // 位置信息占两个元素，颜色信息占用四个元素，每个 float32 占四个字节所以 stride 为 6 * 4 = 24
+    const pOffset  = 0;
+    gl.vertexAttribPointer(a_Position, pSize, pType, pNormalize, pStride, pOffset);
+    
+    const a_Color = gl.getAttribLocation(program, 'a_Color');
+    gl.enableVertexAttribArray(a_Color);
+    // const colorBuffer = gl.createBuffer();
+    // gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+
+    const cSize = 4;
+    const cType = gl.FLOAT;
+    const cNormalize = false;
+    const cStride = 24;
+    const cOffset = 8; // 颜色信息在位置之后
+    gl.vertexAttribPointer(a_Color, cSize, cType, cNormalize, cStride, cOffset);
+
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    const bufferData = [];
+    canvas.addEventListener('click', e=>{
+      const x = e.pageX;
+      const y = e.pageY;
+      const color = randomColor();
+      bufferData.push(x, y);
+      bufferData.push(color.r, color.g, color.b, color.a);
+
+      if(bufferData.length % 18 === 0){
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(bufferData), gl.DYNAMIC_DRAW);
+        
+        render(gl);
+      }
+    })
+
+    function render(gl){
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      if(bufferData.length <= 0){
+        return 
+      }
+      const primitiveType = gl.TRIANGLES;
+      gl.drawArrays(primitiveType, 0, bufferData.length / 6);
+    }
+
+    function randomColor(){
+      const r = Math.random() * 255;
+      const g = Math.random() * 255;
+      const b = Math.random() * 255;
+      return {
+        r,
+        g,
+        b,
+        a: 1
+      }
+    }
+  </script>
+</body>
+</html>
